@@ -7,6 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.x-FF4B4B.svg)
 ![GitHub API](https://img.shields.io/badge/GitHub-Search%20API-181717.svg)
+![MCP](https://img.shields.io/badge/MCP-compatible-8B5CF6.svg)
 ![License](https://img.shields.io/badge/License-MIT-22c55e.svg)
 
 *Search GitHub for open issues worth picking up — filtered by language, recency, and how much competition you're walking into.*
@@ -16,6 +17,7 @@
 [**Results**](#results) •
 [**Setup**](#setup) •
 [**GitHub token**](#github-token) •
+[**MCP server**](#mcp-server) •
 [**Security**](#security)
 
 <br />
@@ -63,7 +65,7 @@ At the top of the results area, the app shows how many repositories and issues w
 ## Setup
 
 ```bash
-git clone https://github.com/your-username/oss-scout.git
+git clone https://github.com/ajayraho/oss-scout.git
 cd oss-scout
 pip install -r requirements.txt
 streamlit run app.py
@@ -85,16 +87,46 @@ Back in the app, open the **GitHub API settings** section in the sidebar, paste 
 
 <img src="images/pat.png" alt="GitHub API settings panel in OSS Scout" width="400" />
 
-If you want the token to load automatically without entering it each time, add it to `.streamlit/secrets.toml`:
+The *Remember this token on this device* checkbox stores a lightly obfuscated copy locally so the field auto-fills on the next visit. Only enable it on a machine you trust and use alone.
 
-```toml
-# .streamlit/secrets.toml
-GITHUB_PAT = "github_pat_..."
+---
+
+## MCP server
+
+OSS Scout ships a built-in [MCP](https://modelcontextprotocol.io) server (`mcp_server.py`) that exposes the issue search as a tool any AI assistant can call directly — no browser needed.
+
+**Tools exposed:**
+
+| Tool | What it does |
+|---|---|
+| `find_oss_issues` | Search GitHub for beginner-friendly issues with full filter support |
+| `check_github_rate_limit` | Check remaining API quota and reset time |
+
+**Wiring it up to Claude desktop:**
+
+1. Open (or create) `%APPDATA%\Claude\claude_desktop_config.json`
+2. Add the following:
+
+```json
+{
+  "mcpServers": {
+    "oss-scout": {
+      "command": "python",
+      "args": ["C:\\path\\to\\oss-scout\\mcp_server.py"]
+    }
+  }
+}
 ```
 
-Make sure this file is in your `.gitignore` — it's already included if you cloned this repo.
+3. Restart Claude desktop.
 
-The *Remember this token on this device* checkbox in the app stores a lightly obfuscated copy in your browser's local storage so you don't have to re-enter it on every visit. Only enable it on a machine you trust and use alone.
+The server automatically reads your saved token from the local cache — no extra config needed if you've already used the Streamlit app with *Remember this token* enabled.
+
+Once connected, you can ask Claude things like:
+
+> *"Find me good first issues in TypeScript repos opened in the last 30 days"*
+
+and it calls the tool live and returns real results in the chat.
 
 ---
 
@@ -104,15 +136,16 @@ The *Remember this token on this device* checkbox in the app stores a lightly ob
 
 **URL validation.** Every URL returned by the GitHub API is checked before it's rendered as a link. Anything that doesn't begin with `https://` or `http://` is silently dropped and replaced with `#`. Issue titles, repo names, labels, and assignee handles are all HTML-escaped before being written into the page.
 
-**The token never leaves your machine** (when running locally). It goes only to `api.github.com` as a Bearer header and is never logged or sent anywhere else. The local storage copy is obfuscated but not encrypted — treat it accordingly.
+**The token never leaves your machine** (when running locally). It goes only to `api.github.com` as a Bearer header and is never logged or sent anywhere else. The local cache file is obfuscated but not encrypted — treat it accordingly.
 
 ---
 
 ## Project structure
 
 ```
-app.py      — Streamlit UI: sidebar filters, scan loop, result cards, bookmarks, CSV export
-github.py   — GitHub API client, search query builder, competition score calculation
+app.py           — Streamlit UI: sidebar filters, scan loop, result cards, bookmarks, CSV export
+github.py        — GitHub API client, search query builder, competition score calculation
+mcp_server.py    — MCP server: exposes find_oss_issues and check_github_rate_limit as AI tools
 ```
 
 ---
