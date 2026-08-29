@@ -1,4 +1,4 @@
-streamlit
+streamlit==1.62.0
 requests
 pandas
 mcp<2
