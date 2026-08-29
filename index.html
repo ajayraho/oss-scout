@@ -355,17 +355,6 @@ section { position: relative; }
   box-shadow: 0 12px 40px rgba(51,50,46,0.08);
 }
 
-.feat-icon {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  background: var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.1rem;
-  font-size: 1.2rem;
-}
-
 .feat-title {
   font-size: 1.05rem;
   font-weight: 700;
@@ -546,7 +535,7 @@ footer {
 
     <div class="cta-group">
       <a
-        href="/tool"
+        href="https://oss-scout-d4bubycwdxfmfubg.indiasouthcentral-01.azurewebsites.net/tool"
         class="btn-primary"
         rel="noopener"
         aria-label="Open OSS Scout tool"
@@ -567,7 +556,6 @@ footer {
       <div class="features-grid">
 
         <article class="feat-card">
-          <div class="feat-icon" aria-hidden="true">🔍</div>
           <h2 class="feat-title">Smart filtering</h2>
           <p class="feat-desc">
             Filter by programming language, star count, repo activity, issue age, and label —
@@ -576,7 +564,6 @@ footer {
         </article>
 
         <article class="feat-card">
-          <div class="feat-icon" aria-hidden="true">📊</div>
           <h2 class="feat-title">Competition scores</h2>
           <p class="feat-desc">
             Each issue gets a LOW / MEDIUM / HIGH badge based on comment count, assignee presence,
@@ -585,11 +572,18 @@ footer {
         </article>
 
         <article class="feat-card">
-          <div class="feat-icon" aria-hidden="true">⚡</div>
           <h2 class="feat-title">Direct issue search</h2>
           <p class="feat-desc">
             Queries GitHub's issue search API directly instead of crawling repos one by one.
             Results come back fast and reflect real-time state on GitHub.
+          </p>
+        </article>
+
+        <article class="feat-card">
+          <h2 class="feat-title">Multi-language</h2>
+          <p class="feat-desc">
+            Search across Python, JavaScript, Go, Rust, and more in a single run.
+            Results are deduplicated and ranked together so the best issues surface regardless of language.
           </p>
         </article>
 
@@ -647,7 +641,7 @@ footer {
       The next issue worth your time is out there. OSS Scout finds it for you in seconds.
     </p>
     <a
-      href="/tool"
+      href="https://oss-scout-d4bubycwdxfmfubg.indiasouthcentral-01.azurewebsites.net/tool"
       class="btn-primary"
       rel="noopener"
       aria-label="Launch OSS Scout"
