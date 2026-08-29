@@ -1882,38 +1882,64 @@ with col_right:
             )
             st.stop()
 
-        client = GitHubClient(token)
+        _lang_str  = ", ".join(languages) if languages else "any language"
+        _label_str = ", ".join(labels)    if labels    else "any label"
 
-        try:
-            quota = client.rate_limit()
-            remaining = quota.get("remaining")
-            limit = quota.get("limit")
-        except RateLimitError as exc:
-            st.markdown(render_banner("error", "✕", "GitHub API rate limit reached", str(exc)), unsafe_allow_html=True)
-            st.stop()
-        except GitHubError as exc:
-            st.markdown(render_banner("error", "✕", "GitHub API error", str(exc)), unsafe_allow_html=True)
-            st.stop()
+        _prog_bar  = st.progress(0, text="Starting search…")
+        _prog_text = st.empty()
 
-        try:
-            # Fetch up to 4× the requested results per (label, language) pair
-            # so that star/activity filtering still leaves enough to fill the
-            # quota. 100 is the hard cap per search page.
-            raw_issues = client.search_candidate_issues(
-                labels=labels,
-                languages=languages,
-                max_comments=max_comments,
-                require_unassigned=require_unassigned,
-                require_no_pr=require_no_pr,
-                issue_age_days=issue_age,
-                max_per_query=min(100, max_results * 4),
+        def _on_retry(attempt, wait):
+            _prog_text.info(f"⏳ Rate limit hit — waiting {wait}s, retry {attempt}/{GitHubClient._BACKOFF_RETRIES}…")
+
+        def _on_search_progress(i, total, lang):
+            pct = int(i / total * 100)
+            label_str = lang if lang else "any language"
+            _prog_bar.progress(pct, text=f"Searching {label_str}… ({i+1}/{total})")
+            _prog_text.empty()
+
+        client = GitHubClient(token, on_retry=_on_retry, on_search_progress=_on_search_progress)
+
+        with st.spinner(f"Searching GitHub — {_label_str} · {_lang_str}…"):
+            try:
+                quota = client.rate_limit()
+                remaining = quota.get("remaining")
+                limit = quota.get("limit")
+            except RateLimitError as exc:
+                st.markdown(render_banner("error", "✕", "GitHub API rate limit reached", str(exc)), unsafe_allow_html=True)
+                st.stop()
+            except GitHubError as exc:
+                st.markdown(render_banner("error", "✕", "GitHub API error", str(exc)), unsafe_allow_html=True)
+                st.stop()
+
+            try:
+                raw_issues = client.search_candidate_issues(
+                    labels=labels,
+                    languages=languages,
+                    max_comments=max_comments,
+                    require_unassigned=require_unassigned,
+                    require_no_pr=require_no_pr,
+                    issue_age_days=issue_age,
+                    max_per_query=min(100, max_results * 4),
+                )
+            except RateLimitError as exc:
+                st.markdown(render_banner("error", "✕", "GitHub API rate limit reached", str(exc)), unsafe_allow_html=True)
+                st.stop()
+            except GitHubError as exc:
+                st.markdown(render_banner("error", "✕", "Could not search GitHub issues", str(exc)), unsafe_allow_html=True)
+                st.stop()
+
+        _prog_bar.empty()
+        _prog_text.empty()
+
+        skipped = getattr(client, "_search_skipped", [])
+        if skipped:
+            skipped_str = ", ".join(skipped)
+            st.warning(
+                f"⚠️ Rate limit hit mid-search — results shown are **partial**. "
+                f"Languages skipped: **{skipped_str}**. "
+                f"Try again in ~60s, or reduce the number of languages selected.",
+                icon="⚠️",
             )
-        except RateLimitError as exc:
-            st.markdown(render_banner("error", "✕", "GitHub API rate limit reached", str(exc)), unsafe_allow_html=True)
-            st.stop()
-        except GitHubError as exc:
-            st.markdown(render_banner("error", "✕", "Could not search GitHub issues", str(exc)), unsafe_allow_html=True)
-            st.stop()
 
         if not raw_issues:
             st.markdown(
