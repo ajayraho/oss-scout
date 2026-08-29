@@ -48,6 +48,20 @@ The left sidebar controls what gets searched.
 
 **Issue limit** caps how many results come back in total, from 10 up to 100.
 
+> **Tip:** selecting 2–3 languages is the sweet spot. Each language runs as a separate API query (with a short pause between them to stay within GitHub's rate limits), so more languages means a longer search and a higher chance of hitting a secondary rate limit mid-way through.
+
+---
+
+## How search works
+
+The search runs in two phases.
+
+**Phase 1 — issue search:** OSS Scout queries GitHub's issue search API once per selected language, applying your label, age, comments, assignee, and linked-PR filters server-side. A short randomised pause (3–6 seconds) sits between each language query to stay within GitHub's secondary rate limits. A progress bar shows which language is currently being searched and how far along the run is.
+
+**Phase 2 — repo verification:** every unique repository that appeared in Phase 1 is fetched individually to check its star count and last-activity date against your sidebar filters. A second progress bar shows which repo is being verified. Repos that don't pass are dropped; issues from repos that do pass are scored and ranked.
+
+If GitHub's secondary rate limit is hit mid-search (even after the app retries with exponential backoff), OSS Scout shows whatever results it collected up to that point rather than discarding everything, along with a warning listing which languages were skipped.
+
 ---
 
 ## Results
@@ -88,6 +102,8 @@ Back in the app, open the **GitHub API settings** section in the sidebar, paste 
 <img src="images/pat.png" alt="GitHub API settings panel in OSS Scout" width="400" />
 
 The *Remember this token on this device* checkbox stores a lightly obfuscated copy locally so the field auto-fills on the next visit. Only enable it on a machine you trust and use alone.
+
+**Handling rate limits gracefully.** When GitHub's secondary rate limit fires (a burst detector separate from the hourly quota), OSS Scout automatically retries with exponential backoff — waiting 2 s, 4 s, 8 s, 16 s, 32 s, and 64 s between attempts before giving up. That's up to ~126 seconds of internal retry before the user sees anything. If the limit persists, the app surfaces partial results from whichever languages already completed and shows a banner listing the ones that were skipped, so the run isn't wasted.
 
 ---
 
@@ -143,8 +159,8 @@ and it calls the tool live and returns real results in the chat.
 ## Project structure
 
 ```
-app.py           — Streamlit UI: sidebar filters, scan loop, result cards, bookmarks, CSV export
-github.py        — GitHub API client, search query builder, competition score calculation
+app.py           — Streamlit UI: sidebar filters, two-phase scan loop, progress bars, result cards, bookmarks, CSV export
+github.py        — GitHub API client, per-language search with exponential backoff, competition score calculation
 mcp_server.py    — MCP server: exposes find_oss_issues and check_github_rate_limit as AI tools
 ```
 
