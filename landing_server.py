@@ -73,8 +73,14 @@ _SKIP_RESP = {"transfer-encoding", "connection", "content-encoding"}
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
 )
 async def http_proxy(path: str, request: Request):
-    url     = f"{STREAMLIT_HTTP}/tool{path}"
+    url = f"{STREAMLIT_HTTP}/tool{path}"
+
+    # Tell Streamlit its real public host so it doesn't embed localhost in redirects
+    public_host = request.headers.get("host", "")
     headers = {k: v for k, v in request.headers.items() if k.lower() not in _SKIP_REQ}
+    headers["X-Forwarded-Host"]  = public_host
+    headers["X-Forwarded-Proto"] = "https"
+    headers["X-Forwarded-For"]   = request.client.host if request.client else ""
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.request(
@@ -87,4 +93,12 @@ async def http_proxy(path: str, request: Request):
         )
 
     out_headers = {k: v for k, v in resp.headers.items() if k.lower() not in _SKIP_RESP}
+
+    # Rewrite any localhost:8501 in redirect Location headers so the browser
+    # never sees the internal address
+    if "location" in out_headers:
+        out_headers["location"] = out_headers["location"].replace(
+            "http://localhost:8501", ""
+        ).replace("https://localhost:8501", "")
+
     return Response(content=resp.content, status_code=resp.status_code, headers=out_headers)
