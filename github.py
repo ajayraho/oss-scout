@@ -7,6 +7,7 @@ app.py should not talk to the GitHub API directly - it only imports from here.
 """
 
 import time
+import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -19,7 +20,8 @@ APP_NAME = "OSS-Scout"
 # Small delay between requests. GitHub asks integrators to stay well under
 # a handful of requests/second on endpoints like search; this keeps a scan
 # clear of secondary rate limits without meaningfully slowing it down.
-API_DELAY = 0.1
+API_DELAY = 1.0
+SEARCH_QUERY_DELAY = 2.0  # extra pause between search queries to avoid secondary rate limits
 
 
 class GitHubError(Exception):
@@ -32,13 +34,19 @@ class RateLimitError(GitHubError):
 
 class GitHubClient:
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: Optional[str] = None, on_retry=None, on_search_progress=None):
+        """
+        on_retry: optional callable(attempt, wait_seconds) called before each
+                  backoff sleep so the caller can update a progress UI.
+        """
         self.session = requests.Session()
         self.session.headers.update({
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": APP_NAME,
         })
+        self._on_retry = on_retry
+        self._on_search_progress = on_search_progress
 
         token = (token or "").strip()
         if token:
@@ -48,55 +56,93 @@ class GitHubClient:
     # HTTP
     # --------------------------------------------------------
 
+    # Exponential backoff config for secondary rate limits.
+    # Waits: 2s, 4s, 8s, 16s — then gives up and shows the error.
+    _BACKOFF_BASE    = 2
+    _BACKOFF_RETRIES = 6
+
+    def _is_secondary_rate_limit(self, response) -> bool:
+        """Return True if GitHub is asking us to slow down (secondary limit)."""
+        if response.status_code not in (403, 429):
+            return False
+        try:
+            msg = response.json().get("message", "").lower()
+        except Exception:
+            msg = response.text.lower()
+        return "secondary rate limit" in msg or response.status_code == 429
+
     def get(self, endpoint, params=None):
         url = endpoint if endpoint.startswith("http") else GITHUB_API + endpoint
 
-        try:
-            response = self.session.get(url, params=params, timeout=30)
-        except requests.RequestException as exc:
-            raise GitHubError(f"Could not reach GitHub API: {exc}") from exc
+        for attempt in range(self._BACKOFF_RETRIES + 1):
+            try:
+                response = self.session.get(url, params=params, timeout=30)
+            except requests.RequestException as exc:
+                raise GitHubError(f"Could not reach GitHub API: {exc}") from exc
 
-        remaining = response.headers.get("X-RateLimit-Remaining")
-        reset = response.headers.get("X-RateLimit-Reset")
+            remaining = response.headers.get("X-RateLimit-Remaining")
+            reset      = response.headers.get("X-RateLimit-Reset")
 
-        if response.status_code == 401:
-            raise GitHubError(
-                "GitHub rejected the token (401). Check that the PAT is "
-                "valid, not expired, and was copied correctly."
-            )
-
-        if response.status_code == 403:
-            if remaining == "0":
+            # ── Secondary rate limit → backoff and retry ──────────────────
+            if self._is_secondary_rate_limit(response):
+                if attempt < self._BACKOFF_RETRIES:
+                    wait = self._BACKOFF_BASE ** (attempt + 1)
+                    # Honour Retry-After header when present
+                    retry_after = response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait = max(wait, int(retry_after))
+                        except ValueError:
+                            pass
+                    if callable(self._on_retry):
+                        self._on_retry(attempt + 1, wait)
+                    time.sleep(wait)
+                    continue  # retry
+                # All retries exhausted — surface to the caller
+                try:
+                    message = response.json().get("message", "Secondary rate limit")
+                except Exception:
+                    message = "Secondary rate limit"
                 raise RateLimitError(
-                    "GitHub API rate limit reached." + self._format_reset(reset)
+                    f"GitHub secondary rate limit hit after {self._BACKOFF_RETRIES} retries. "
+                    "Please wait a few minutes and try again."
                 )
 
+            # ── Hard quota exhausted ──────────────────────────────────────
+            if response.status_code == 401:
+                raise GitHubError(
+                    "GitHub rejected the token (401). Check that the PAT is "
+                    "valid, not expired, and was copied correctly."
+                )
+
+            if response.status_code == 403:
+                if remaining == "0":
+                    raise RateLimitError(
+                        "GitHub API rate limit reached." + self._format_reset(reset)
+                    )
+                try:
+                    message = response.json().get("message", "Forbidden")
+                except Exception:
+                    message = response.text
+                raise GitHubError(f"GitHub returned 403: {message}")
+
+            if response.status_code == 404:
+                return None
+
+            if response.status_code >= 400:
+                try:
+                    message = response.json().get("message", response.text)
+                except Exception:
+                    message = response.text
+                raise GitHubError(f"GitHub API returned {response.status_code}: {message}")
+
             try:
-                message = response.json().get("message", "Forbidden")
-            except Exception:
-                message = response.text
+                data = response.json()
+            except Exception as exc:
+                raise GitHubError("GitHub returned an invalid JSON response.") from exc
 
-            raise GitHubError(f"GitHub returned 403: {message}")
-
-        if response.status_code == 404:
-            return None
-
-        if response.status_code >= 400:
-            try:
-                message = response.json().get("message", response.text)
-            except Exception:
-                message = response.text
-
-            raise GitHubError(f"GitHub API returned {response.status_code}: {message}")
-
-        try:
-            data = response.json()
-        except Exception as exc:
-            raise GitHubError("GitHub returned an invalid JSON response.") from exc
-
-        time.sleep(API_DELAY)
-
-        return data
+            time.sleep(API_DELAY)
+            return data
 
     @staticmethod
     def _format_reset(reset):
@@ -217,13 +263,23 @@ class GitHubClient:
         the caller uses to do per-repo star/activity verification.
         """
         labels_to_query = [la for la in (labels or []) if la] or [None]
-        langs_to_query = [lg for lg in (languages or []) if lg] or [None]
+        langs_to_query  = [lg for lg in (languages or []) if lg] or [None]
 
         seen_ids = set()
         raw_issues = []
 
-        for label in labels_to_query:
-            for lang in langs_to_query:
+        # One query per (label, language) pair.
+        # A random 3-6s pause between queries keeps us clear of GitHub's
+        # secondary rate limits without hammering the API.
+        pairs = [(la, lg) for la in labels_to_query for lg in langs_to_query]
+        total_pairs = len(pairs)
+        self._search_skipped = []  # languages skipped due to rate limit
+
+        for i, (label, lang) in enumerate(pairs):
+            if callable(getattr(self, "_on_search_progress", None)):
+                self._on_search_progress(i, total_pairs, lang)
+
+            try:
                 batch = self._search_issues_single(
                     label=label,
                     language=lang,
@@ -233,11 +289,23 @@ class GitHubClient:
                     issue_age_days=issue_age_days,
                     max_per_query=max_per_query,
                 )
-                for issue in batch:
-                    iid = issue.get("id")
-                    if iid and iid not in seen_ids:
-                        seen_ids.add(iid)
-                        raw_issues.append(issue)
+            except RateLimitError:
+                # Rate limit exhausted — record skipped languages and stop.
+                # Return whatever we've collected so far as partial results.
+                remaining = [lg for (_, lg) in pairs[i:] if lg]
+                self._search_skipped = list(dict.fromkeys(remaining))  # dedupe, preserve order
+                if callable(getattr(self, "_on_search_progress", None)):
+                    self._on_search_progress(total_pairs, total_pairs, None)
+                break
+
+            for issue in batch:
+                iid = issue.get("id")
+                if iid and iid not in seen_ids:
+                    seen_ids.add(iid)
+                    raw_issues.append(issue)
+
+            if i < total_pairs - 1:
+                time.sleep(random.uniform(3, 6))
 
         return raw_issues
 
