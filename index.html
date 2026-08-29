@@ -1,0 +1,669 @@
+<title>OSS Scout</title>
+<meta name="description" content="OSS Scout searches GitHub for open-source issues worth picking up — filtered by language, stars, recency, and ranked by competition level. Find where you actually have a shot.">
+<meta name="keywords" content="open source issues, good first issue, help wanted, GitHub issues, open source contribution, beginner friendly issues, OSS contributions">
+<meta name="robots" content="index, follow">
+<meta property="og:title" content="OSS Scout — Find Open-Source Issues Worth Picking Up">
+<meta property="og:description" content="Stop scrolling through stale GitHub issues. OSS Scout filters by language, ranks by competition, and shows you where you actually have a shot.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://raw.githubusercontent.com/ajayraho/oss-scout/main/images/main.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OSS Scout — Find Open-Source Issues Worth Picking Up">
+<meta name="twitter:description" content="Search GitHub for beginner-friendly open-source issues, ranked by competition level.">
+<link rel="canonical" href="https://ajayraho.github.io/oss-scout/">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "OSS Scout",
+  "description": "Search GitHub for open-source issues worth picking up, filtered by language, recency, and competition level.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "url": "/tool",
+  "author": { "@type": "Person", "name": "Ajay Raho" }
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap">
+
+<style>
+/* ── Tokens ───────────────────────────────────── */
+:root {
+  --bg:       #f1f0ec;
+  --ink:      #33322e;
+  --muted:    #8b897f;
+  --line:     #e3e0d8;
+  --surface:  rgba(255,255,255,0.62);
+  --sb:       rgba(255,255,255,0.78);
+  --pill:     #2e2d2a;
+  --pill-fg:  #f1f0ec;
+
+  --b1: rgba(167,196,232,0.55);
+  --b2: rgba(227,180,201,0.48);
+  --b3: rgba(240,165,122,0.40);
+  --b4: rgba(167,196,232,0.30);
+
+  --low-tint: #e7f3ec;
+  --low-text: #0b7a56;
+  --med-tint: #fbf0dd;
+  --med-text: #9a5b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:      #1c1b18;
+    --ink:     #f1f0ec;
+    --muted:   #9b9890;
+    --line:    #2e2d2a;
+    --surface: rgba(40,39,36,0.70);
+    --sb:      rgba(50,49,46,0.80);
+    --pill:    #f1f0ec;
+    --pill-fg: #1c1b18;
+    --b1: rgba(167,196,232,0.25);
+    --b2: rgba(227,180,201,0.22);
+    --b3: rgba(240,165,122,0.18);
+    --b4: rgba(167,196,232,0.15);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:      #1c1b18;
+  --ink:     #f1f0ec;
+  --muted:   #9b9890;
+  --line:    #2e2d2a;
+  --surface: rgba(40,39,36,0.70);
+  --sb:      rgba(50,49,46,0.80);
+  --pill:    #f1f0ec;
+  --pill-fg: #1c1b18;
+  --b1: rgba(167,196,232,0.25);
+  --b2: rgba(227,180,201,0.22);
+  --b3: rgba(240,165,122,0.18);
+  --b4: rgba(167,196,232,0.15);
+}
+
+/* ── Reset ────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Animated background blobs ───────────────── */
+.blobs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform;
+}
+
+.blob-1 {
+  width: 70vw; height: 70vw;
+  top: -20%; left: -10%;
+  background: radial-gradient(circle, var(--b1), transparent 70%);
+  animation: drift1 28s ease-in-out infinite;
+}
+.blob-2 {
+  width: 55vw; height: 55vw;
+  top: -10%; right: -15%;
+  background: radial-gradient(circle, var(--b2), transparent 70%);
+  animation: drift2 24s ease-in-out infinite;
+}
+.blob-3 {
+  width: 60vw; height: 60vw;
+  bottom: -20%; right: 10%;
+  background: radial-gradient(circle, var(--b3), transparent 70%);
+  animation: drift3 32s ease-in-out infinite;
+}
+.blob-4 {
+  width: 45vw; height: 45vw;
+  bottom: 0%; left: -5%;
+  background: radial-gradient(circle, var(--b4), transparent 70%);
+  animation: drift4 22s ease-in-out infinite;
+}
+
+@keyframes drift1 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33%      { transform: translate(6vw, 8vh) scale(1.05); }
+  66%      { transform: translate(-4vw, 12vh) scale(0.97); }
+}
+@keyframes drift2 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  40%      { transform: translate(-8vw, 6vh) scale(1.08); }
+  70%      { transform: translate(5vw, -4vh) scale(0.95); }
+}
+@keyframes drift3 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  30%      { transform: translate(-6vw,-8vh) scale(1.04); }
+  65%      { transform: translate(8vw,-3vh) scale(0.96); }
+}
+@keyframes drift4 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(10vw,-6vh) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob { animation: none; }
+}
+
+/* ── Layout wrappers ──────────────────────────── */
+.page { position: relative; z-index: 1; }
+
+section { position: relative; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ── Hero ─────────────────────────────────────── */
+.hero {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+  gap: 0;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--low-text);
+  background: var(--low-tint);
+  border-radius: 100px;
+  padding: 5px 14px;
+  margin-bottom: 2rem;
+  opacity: 0;
+  animation: fade-up 0.6s ease 0.1s forwards;
+}
+
+.hero-eyebrow svg {
+  width: 12px; height: 12px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.wordmark {
+  font-size: clamp(3.2rem, 8vw, 6.5rem);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 1.5rem;
+  text-wrap: balance;
+  opacity: 0;
+  animation: fade-up 0.7s ease 0.2s forwards;
+}
+
+.wordmark strong {
+  font-weight: 800;
+}
+
+.hero-tagline {
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  font-weight: 400;
+  color: var(--muted);
+  max-width: 540px;
+  line-height: 1.65;
+  text-wrap: balance;
+  margin-bottom: 2.8rem;
+  opacity: 0;
+  animation: fade-up 0.7s ease 0.35s forwards;
+}
+
+.cta-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  opacity: 0;
+  animation: fade-up 0.7s ease 0.5s forwards;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--pill);
+  color: var(--pill-fg);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 14px 32px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 2px 12px rgba(46,45,42,0.15);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(46,45,42,0.22);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary .arrow {
+  font-size: 1.1em;
+  transition: transform 0.18s ease;
+}
+
+.btn-primary:hover .arrow {
+  transform: translateX(4px);
+}
+
+.cta-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* competition badges in hero */
+.badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 3.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  animation: fade-up 0.7s ease 0.65s forwards;
+}
+
+.badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 100px;
+}
+
+.badge-low  { background: var(--low-tint); color: var(--low-text); }
+.badge-med  { background: var(--med-tint); color: var(--med-text); }
+.badge-high { background: #fbe9e7; color: #a33b30; }
+
+.badge-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  align-self: center;
+  font-weight: 500;
+}
+
+/* ── Divider ──────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--line);
+  margin: 0 auto;
+  max-width: 1100px;
+  opacity: 0.7;
+}
+
+/* ── Features ─────────────────────────────────── */
+.features {
+  padding: 6rem 2rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 1.25rem;
+}
+
+.feat-card {
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--sb);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 40px rgba(51,50,46,0.08);
+}
+
+.feat-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.1rem;
+  font-size: 1.2rem;
+}
+
+.feat-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+.feat-desc {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ── How it works ─────────────────────────────── */
+.how {
+  padding: 2rem 2rem 6rem;
+}
+
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.how-heading {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin-bottom: 3rem;
+  max-width: 500px;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.step-num {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.step-connector {
+  width: 32px;
+  height: 1px;
+  background: var(--line);
+  margin: 0.2rem 0;
+}
+
+.step-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.step-desc {
+  font-size: 0.875rem;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+/* ── Bottom CTA ───────────────────────────────── */
+.bottom-cta {
+  padding: 5rem 2rem 7rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.bottom-cta-heading {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  max-width: 520px;
+  line-height: 1.15;
+}
+
+.bottom-cta-sub {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+/* ── Footer ───────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 1.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer-brand {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.footer-brand span { font-weight: 300; }
+
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.footer-links a {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s;
+}
+
+.footer-links a:hover { color: var(--ink); }
+
+/* ── Animations ───────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Focus styles ─────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ── Responsive ───────────────────────────────── */
+@media (max-width: 640px) {
+  .hero { padding: 5rem 1.5rem 3rem; }
+  .features { padding: 4rem 1.5rem; }
+  .how { padding: 2rem 1.5rem 4rem; }
+  .bottom-cta { padding: 4rem 1.5rem 5rem; }
+  footer { flex-direction: column; align-items: flex-start; }
+  .badges { gap: 6px; }
+}
+</style>
+
+<!-- Blobs -->
+<div class="blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+</div>
+
+<div class="page">
+
+  <!-- ── Hero ──────────────────────────────────── -->
+  <section class="hero" aria-label="Hero">
+
+    <h1 class="wordmark">OSS <strong>Scout</strong></h1>
+
+    <p class="hero-tagline">
+      Search GitHub for open-source issues worth picking up — filtered by language,
+      recency, and ranked by how contested they already are.
+    </p>
+
+    <div class="cta-group">
+      <a
+        href="/tool"
+        class="btn-primary"
+        rel="noopener"
+        aria-label="Open OSS Scout tool"
+      >
+        Open OSS Scout <span class="arrow" aria-hidden="true">→</span>
+      </a>
+      <span class="cta-note">No signup required · Bring your own GitHub token</span>
+    </div>
+
+
+  </section>
+
+  <div class="divider" role="separator"></div>
+
+  <!-- ── Features ──────────────────────────────── -->
+  <section class="features" aria-label="Features">
+    <div class="container">
+      <div class="features-grid">
+
+        <article class="feat-card">
+          <div class="feat-icon" aria-hidden="true">🔍</div>
+          <h2 class="feat-title">Smart filtering</h2>
+          <p class="feat-desc">
+            Filter by programming language, star count, repo activity, issue age, and label —
+            <code>good first issue</code>, <code>help wanted</code>, or any custom tag the project uses.
+          </p>
+        </article>
+
+        <article class="feat-card">
+          <div class="feat-icon" aria-hidden="true">📊</div>
+          <h2 class="feat-title">Competition scores</h2>
+          <p class="feat-desc">
+            Each issue gets a LOW / MEDIUM / HIGH badge based on comment count, assignee presence,
+            and linked pull requests — so you know where you actually have a shot before clicking through.
+          </p>
+        </article>
+
+        <article class="feat-card">
+          <div class="feat-icon" aria-hidden="true">⚡</div>
+          <h2 class="feat-title">Direct issue search</h2>
+          <p class="feat-desc">
+            Queries GitHub's issue search API directly instead of crawling repos one by one.
+            Results come back fast and reflect real-time state on GitHub.
+          </p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" role="separator"></div>
+
+  <!-- ── How it works ───────────────────────────── -->
+  <section class="how" aria-label="How it works">
+    <div class="container">
+      <p class="section-label">How it works</p>
+      <h2 class="how-heading">From filters to a ranked list in seconds</h2>
+      <div class="steps">
+
+        <div class="step">
+          <span class="step-num">01</span>
+          <div class="step-connector" aria-hidden="true"></div>
+          <h3 class="step-title">Set your filters</h3>
+          <p class="step-desc">Pick languages, star range, issue labels, max comments, and how recent the issue should be.</p>
+        </div>
+
+        <div class="step">
+          <span class="step-num">02</span>
+          <div class="step-connector" aria-hidden="true"></div>
+          <h3 class="step-title">OSS Scout searches GitHub</h3>
+          <p class="step-desc">Queries the GitHub Search API per language, verifies each repo against your filters, and scores every issue it finds.</p>
+        </div>
+
+        <div class="step">
+          <span class="step-num">03</span>
+          <div class="step-connector" aria-hidden="true"></div>
+          <h3 class="step-title">Pick an issue and contribute</h3>
+          <p class="step-desc">Results are grouped by repo with competition badges. Click any issue title to open it directly on GitHub.</p>
+        </div>
+
+        <div class="step">
+          <span class="step-num">04</span>
+          <div class="step-connector" aria-hidden="true"></div>
+          <h3 class="step-title">Export or bookmark</h3>
+          <p class="step-desc">Download results as CSV or star repos to a bookmark panel so you can come back later.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" role="separator"></div>
+
+  <!-- ── Bottom CTA ─────────────────────────────── -->
+  <section class="bottom-cta" aria-label="Call to action">
+    <h2 class="bottom-cta-heading">Stop scrolling. Start contributing.</h2>
+    <p class="bottom-cta-sub">
+      The next issue worth your time is out there. OSS Scout finds it for you in seconds.
+    </p>
+    <a
+      href="/tool"
+      class="btn-primary"
+      rel="noopener"
+      aria-label="Launch OSS Scout"
+    >
+      Launch OSS Scout <span class="arrow" aria-hidden="true">→</span>
+    </a>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────── -->
+  <footer>
+    <div class="footer-brand">OSS <span>Scout</span> · Made by Ajit</div>
+    <nav class="footer-links" aria-label="Footer links">
+      <a href="https://github.com/ajayraho/oss-scout" rel="noopener">GitHub</a>
+      <a href="https://github.com/ajayraho/oss-scout/blob/main/README.md" rel="noopener">Docs</a>
+      <a href="https://github.com/ajayraho/oss-scout/blob/main/LICENSE" rel="noopener">MIT License</a>
+    </nav>
+  </footer>
+
+</div>
