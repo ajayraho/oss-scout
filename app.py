@@ -308,7 +308,18 @@ html {
     font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-.stApp input, .stApp textarea {
+/* High-specificity input overrides — needed for Azure/Linux where Streamlit's
+   internal .stTextInput input rules (specificity 0,2,1) beat our .stApp input (0,1,1) */
+.stApp .stTextInput input,
+.stApp .stTextArea textarea,
+.stApp .stNumberInput input,
+.stApp [data-testid="stTextInput"] input,
+.stApp [data-testid="stTextArea"] textarea,
+.stApp [data-testid="stNumberInput"] input,
+.stApp [data-baseweb="input"] input,
+.stApp [data-baseweb="base-input"] input,
+.stApp input:not([type="checkbox"]),
+.stApp textarea {
     border-radius: 8px !important;
     border-color: var(--line) !important;
     background: rgba(255,255,255,0.6) !important;
